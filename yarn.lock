@@ -1938,7 +1938,7 @@ __metadata:
     "@nuxt/schema": 3.0.0-rc.9
     "@rollup/plugin-replace": ^4.0.0
     "@types/cssnano": ^5
-    "@vitejs/plugin-vue": ^3.1.0
+    "@vitejs/plugin-vue": ^4.1.0
     "@vitejs/plugin-vue-jsx": ^2.0.1
     autoprefixer: ^10.4.10
     chokidar: ^3.5.3
@@ -3150,13 +3150,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vitejs/plugin-vue@npm:^3.1.0":
-  version: 3.1.0
-  resolution: "@vitejs/plugin-vue@npm:3.1.0"
+"@vitejs/plugin-vue@npm:^4.1.0":
+  version: 4.1.0
+  resolution: "@vitejs/plugin-vue@npm:4.1.0"
   peerDependencies:
-    vite: ^3.0.0
+    vite: ^4.0.0
     vue: ^3.2.25
-  checksum: 351436306090dee709314f71bb52f0b502c284c8f556d4aecbbdfea840b1d35a8af32e78e962df28d3a6034a75c78886448e3371cee320f711dab833f6ada274
+  checksum: 532192a3da39f3fd6ba9d4fa9de74533cf6e222785c26bcb75bde9f826c5c4a22ad6f0bb09fae83e3393f9d8d24b6982d547683b1967972a4350e8e76aecf3cb
   languageName: node
   linkType: hard
 
