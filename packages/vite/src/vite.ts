@@ -1,29 +1,23 @@
 import * as vite from 'vite'
 import { join, resolve } from 'pathe'
-import type { Nuxt } from '@nuxt/schema'
-import type { InlineConfig, SSROptions } from 'vite'
-import { logger, isIgnored, resolvePath } from '@nuxt/kit'
-import type { Options } from '@vitejs/plugin-vue'
+import type { Nuxt, ViteConfig } from '@nuxt/schema'
+import { logger, isIgnored, resolvePath, addVitePlugin } from '@nuxt/kit'
 import replace from '@rollup/plugin-replace'
 import { sanitizeFilePath } from 'mlly'
 import { withoutLeadingSlash } from 'ufo'
 import { filename } from 'pathe/utils'
+import { resolveTSConfig } from 'pkg-types'
 import { buildClient } from './client'
 import { buildServer } from './server'
 import virtual from './plugins/virtual'
 import { warmupViteServer } from './utils/warmup'
 import { resolveCSSOptions } from './css'
 import { composableKeysPlugin } from './plugins/composable-keys'
-
-export interface ViteOptions extends InlineConfig {
-  vue?: Options
-  ssr?: SSROptions
-  devBundler?: 'vite-node' | 'legacy'
-}
+import { logLevelMap } from './utils/logger'
 
 export interface ViteBuildContext {
   nuxt: Nuxt
-  config: ViteOptions
+  config: ViteConfig
   entry: string
   clientServer?: vite.ViteDevServer
   ssrServer?: vite.ViteDevServer
@@ -38,6 +32,7 @@ export async function bundle (nuxt: Nuxt) {
     entry,
     config: vite.mergeConfig(
       {
+        logLevel: logLevelMap[nuxt.options.logLevel] ?? logLevelMap.info,
         resolve: {
           alias: {
             ...nuxt.options.alias,
@@ -52,12 +47,18 @@ export async function bundle (nuxt: Nuxt) {
           }
         },
         optimizeDeps: {
-          include: ['vue']
+          include: ['vue'],
+          exclude: ['nuxt/app']
         },
         css: resolveCSSOptions(nuxt),
+        define: { __NUXT_VERSION__: JSON.stringify(nuxt._version) },
         build: {
+          copyPublicDir: false,
           rollupOptions: {
             output: {
+              sourcemapIgnoreList: (relativeSourcePath) => {
+                return relativeSourcePath.includes('node_modules') || relativeSourcePath.includes(ctx.nuxt.options.buildDir)
+              },
               sanitizeFileName: sanitizeFilePath,
               // https://github.com/vitejs/vite/tree/main/packages/vite/src/node/build.ts#L464-L478
               assetFileNames: nuxt.options.dev
@@ -70,7 +71,11 @@ export async function bundle (nuxt: Nuxt) {
           }
         },
         plugins: [
-          composableKeysPlugin.vite({ sourcemap: nuxt.options.sourcemap.server || nuxt.options.sourcemap.client, rootDir: nuxt.options.rootDir }),
+          composableKeysPlugin.vite({
+            sourcemap: nuxt.options.sourcemap.server || nuxt.options.sourcemap.client,
+            rootDir: nuxt.options.rootDir,
+            composables: nuxt.options.optimization.keyedComposables
+          }),
           replace({
             ...Object.fromEntries([';', '(', '{', '}', ' ', '\t', '\n'].map(d => [`${d}global.`, `${d}globalThis.`])),
             preventAssignment: true
@@ -84,11 +89,12 @@ export async function bundle (nuxt: Nuxt) {
           watch: { ignored: isIgnored },
           fs: {
             allow: [
-              nuxt.options.appDir
+              nuxt.options.appDir,
+              ...nuxt.options._layers.map(l => l.config.rootDir)
             ]
           }
         }
-      } as ViteOptions,
+      } satisfies ViteConfig,
       nuxt.options.vite
     )
   }
@@ -102,6 +108,16 @@ export async function bundle (nuxt: Nuxt) {
 
   await nuxt.callHook('vite:extend', ctx)
 
+  // Add type-checking
+  if (ctx.nuxt.options.typescript.typeCheck === true || (ctx.nuxt.options.typescript.typeCheck === 'build' && !ctx.nuxt.options.dev)) {
+    const checker = await import('vite-plugin-checker').then(r => r.default)
+    addVitePlugin(checker({
+      vueTsc: {
+        tsconfigPath: await resolveTSConfig(ctx.nuxt.options.rootDir)
+      }
+    }), { client: !nuxt.options.ssr, server: nuxt.options.ssr })
+  }
+
   nuxt.hook('vite:serverCreated', (server: vite.ViteDevServer, env) => {
     // Invalidate virtual modules when templates are re-generated
     ctx.nuxt.hook('app:templatesGenerated', () => {
@@ -112,7 +128,11 @@ export async function bundle (nuxt: Nuxt) {
       }
     })
 
-    if (nuxt.options.vite.warmupEntry !== false) {
+    if (
+      nuxt.options.vite.warmupEntry !== false &&
+      // https://github.com/nuxt/nuxt/issues/14898
+      !(env.isServer && ctx.nuxt.options.vite.devBundler !== 'legacy')
+    ) {
       const start = Date.now()
       warmupViteServer(server, [join('/@fs/', ctx.entry)], env.isServer)
         .then(() => logger.info(`Vite ${env.isClient ? 'client' : 'server'} warmed up in ${Date.now() - start}ms`))

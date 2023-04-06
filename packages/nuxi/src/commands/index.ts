@@ -5,6 +5,7 @@ const _rDefault = (r: any) => r.default || r
 export const commands = {
   dev: () => import('./dev').then(_rDefault),
   build: () => import('./build').then(_rDefault),
+  'build-module': () => import('./build-module').then(_rDefault),
   cleanup: () => import('./cleanup').then(_rDefault),
   clean: () => import('./cleanup').then(_rDefault),
   preview: () => import('./preview').then(_rDefault),
@@ -17,6 +18,7 @@ export const commands = {
   info: () => import('./info').then(_rDefault),
   init: () => import('./init').then(_rDefault),
   create: () => import('./init').then(_rDefault),
+  devtools: () => import('./devtools').then(_rDefault),
   upgrade: () => import('./upgrade').then(_rDefault),
   test: () => import('./test').then(_rDefault),
   add: () => import('./add').then(_rDefault),
@@ -35,7 +37,7 @@ export interface NuxtCommandMeta {
 export type CLIInvokeResult = void | 'error' | 'wait'
 
 export interface NuxtCommand {
-  invoke(args: Argv): Promise<CLIInvokeResult> | CLIInvokeResult
+  invoke(args: Argv, options?: Record<string, any>): Promise<CLIInvokeResult> | CLIInvokeResult
   meta: NuxtCommandMeta
 }
 
